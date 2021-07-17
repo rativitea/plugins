@@ -829,3 +829,17 @@ final class GoogleMapController
     this.buildingsEnabled = buildingsEnabled;
   }
 }
+
+//this has been newly added
+  @Override
+  public void onActivityResumed(Activity activity) {
+    if (disposed || activity.hashCode() != registrarActivityHashCode) {
+      return;
+    }
+    mapView.onResume();
+    // Workaround for https://github.com/flutter/flutter/issues/40284
+    // This apparently forces a re-render of the map.
+    if (googleMap != null) {
+      googleMap.setMapType(googleMap.getMapType());
+    }
+  }
