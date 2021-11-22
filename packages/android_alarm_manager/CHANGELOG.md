@@ -2,6 +2,8 @@
 
 * Remove support for the V1 Android embedding.
 * Updated Android lint settings.
+* Removed `-Werror` in Android builds.
+* Updates example app Android compileSdkVersion to 31.
 
 ## 2.0.2
 

@@ -1,6 +1,11 @@
 ## NEXT
 
+* Updates example app Android compileSdkVersion to 31.
+
+## 0.1.0+4
+
 * Updated Android lint settings.
+* Updated package description.
 
 ## 0.1.0+3
 
