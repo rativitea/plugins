@@ -1,3 +1,25 @@
+## 6.0.20
+
+* Fixes a typo in `default_package` registration for Windows, macOS, and Linux.
+
+## 6.0.19
+
+* Updates README:
+  * Adds description for `file` scheme usage.
+  * Updates `Uri` class link to SDK documentation.
+
+## 6.0.18
+
+* Removes dependency on `meta`.
+
+## 6.0.17
+
+* Updates code for new analysis options.
+
+## 6.0.16
+
+* Moves Android and iOS implementations to federated packages.
+
 ## 6.0.15
 
 * Updates README:

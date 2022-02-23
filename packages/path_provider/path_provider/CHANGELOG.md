@@ -1,6 +1,12 @@
-## NEXT
+## 2.0.9
+
+* Updates documentation on README.md.
+* Updates example application.
+
+## 2.0.8
 
 * Updates example app Android compileSdkVersion to 31.
+* Removes obsolete manual registration of Windows and Linux implementations.
 
 ## 2.0.7
 

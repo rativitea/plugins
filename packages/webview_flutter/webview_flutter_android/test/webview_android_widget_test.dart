@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,12 +11,17 @@ import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
 import 'package:webview_flutter_android/src/android_webview.dart'
     as android_webview;
+import 'package:webview_flutter_android/src/android_webview_api_impls.dart';
+import 'package:webview_flutter_android/src/instance_manager.dart';
 import 'package:webview_flutter_android/webview_android_widget.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
 
+import 'android_webview.pigeon.dart';
+import 'android_webview_test.mocks.dart' show MockTestWebViewHostApi;
 import 'webview_android_widget_test.mocks.dart';
 
 @GenerateMocks(<Type>[
+  android_webview.FlutterAssetManager,
   android_webview.WebSettings,
   android_webview.WebView,
   WebViewAndroidDownloadListener,
@@ -29,7 +35,8 @@ import 'webview_android_widget_test.mocks.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('$WebViewAndroidWidget', () {
+  group('WebViewAndroidWidget', () {
+    late MockFlutterAssetManager mockFlutterAssetManager;
     late MockWebView mockWebView;
     late MockWebSettings mockWebSettings;
     late MockWebViewProxy mockWebViewProxy;
@@ -44,6 +51,7 @@ void main() {
     late WebViewAndroidPlatformController testController;
 
     setUp(() {
+      mockFlutterAssetManager = MockFlutterAssetManager();
       mockWebView = MockWebView();
       mockWebSettings = MockWebSettings();
       when(mockWebView.settings).thenReturn(mockWebSettings);
@@ -70,13 +78,14 @@ void main() {
         creationParams: creationParams ??
             CreationParams(
                 webSettings: WebSettings(
-              userAgent: WebSetting<String?>.absent(),
+              userAgent: const WebSetting<String?>.absent(),
               hasNavigationDelegate: hasNavigationDelegate,
               hasProgressTracking: hasProgressTracking,
             )),
         callbacksHandler: mockCallbacksHandler,
         javascriptChannelRegistry: mockJavascriptChannelRegistry,
         webViewProxy: mockWebViewProxy,
+        flutterAssetManager: mockFlutterAssetManager,
         onBuildWidget: (WebViewAndroidPlatformController controller) {
           testController = controller;
           return Container();
@@ -88,7 +97,7 @@ void main() {
       webChromeClient = testController.webChromeClient;
     }
 
-    testWidgets('$WebViewAndroidWidget', (WidgetTester tester) async {
+    testWidgets('WebViewAndroidWidget', (WidgetTester tester) async {
       await buildWidget(tester);
 
       verify(mockWebSettings.setDomStorageEnabled(true));
@@ -114,14 +123,14 @@ void main() {
       },
     );
 
-    group('$CreationParams', () {
+    group('CreationParams', () {
       testWidgets('initialUrl', (WidgetTester tester) async {
         await buildWidget(
           tester,
           creationParams: CreationParams(
             initialUrl: 'https://www.google.com',
             webSettings: WebSettings(
-              userAgent: WebSetting<String?>.absent(),
+              userAgent: const WebSetting<String?>.absent(),
               hasNavigationDelegate: false,
             ),
           ),
@@ -138,7 +147,7 @@ void main() {
           creationParams: CreationParams(
             userAgent: 'MyUserAgent',
             webSettings: WebSettings(
-              userAgent: WebSetting<String?>.absent(),
+              userAgent: const WebSetting<String?>.absent(),
               hasNavigationDelegate: false,
             ),
           ),
@@ -154,7 +163,7 @@ void main() {
             autoMediaPlaybackPolicy:
                 AutoMediaPlaybackPolicy.require_user_action_for_all_media_types,
             webSettings: WebSettings(
-              userAgent: WebSetting<String?>.absent(),
+              userAgent: const WebSetting<String?>.absent(),
               hasNavigationDelegate: false,
             ),
           ),
@@ -169,7 +178,7 @@ void main() {
           creationParams: CreationParams(
             autoMediaPlaybackPolicy: AutoMediaPlaybackPolicy.always_allow,
             webSettings: WebSettings(
-              userAgent: WebSetting<String?>.absent(),
+              userAgent: const WebSetting<String?>.absent(),
               hasNavigationDelegate: false,
             ),
           ),
@@ -184,7 +193,7 @@ void main() {
           creationParams: CreationParams(
             javascriptChannelNames: <String>{'a', 'b'},
             webSettings: WebSettings(
-              userAgent: WebSetting<String?>.absent(),
+              userAgent: const WebSetting<String?>.absent(),
               hasNavigationDelegate: false,
             ),
           ),
@@ -196,13 +205,13 @@ void main() {
         expect(javaScriptChannels[1].channelName, 'b');
       });
 
-      group('$WebSettings', () {
+      group('WebSettings', () {
         testWidgets('javascriptMode', (WidgetTester tester) async {
           await buildWidget(
             tester,
             creationParams: CreationParams(
               webSettings: WebSettings(
-                userAgent: WebSetting<String?>.absent(),
+                userAgent: const WebSetting<String?>.absent(),
                 javascriptMode: JavascriptMode.unrestricted,
                 hasNavigationDelegate: false,
               ),
@@ -217,7 +226,7 @@ void main() {
             tester,
             creationParams: CreationParams(
               webSettings: WebSettings(
-                userAgent: WebSetting<String?>.absent(),
+                userAgent: const WebSetting<String?>.absent(),
                 hasNavigationDelegate: true,
               ),
             ),
@@ -227,12 +236,12 @@ void main() {
           expect(testController.webViewClient.shouldOverrideUrlLoading, isTrue);
         });
 
-        testWidgets('debuggingEnabled', (WidgetTester tester) async {
+        testWidgets('debuggingEnabled true', (WidgetTester tester) async {
           await buildWidget(
             tester,
             creationParams: CreationParams(
               webSettings: WebSettings(
-                userAgent: WebSetting<String?>.absent(),
+                userAgent: const WebSetting<String?>.absent(),
                 debuggingEnabled: true,
                 hasNavigationDelegate: false,
               ),
@@ -242,12 +251,27 @@ void main() {
           verify(mockWebViewProxy.setWebContentsDebuggingEnabled(true));
         });
 
+        testWidgets('debuggingEnabled false', (WidgetTester tester) async {
+          await buildWidget(
+            tester,
+            creationParams: CreationParams(
+              webSettings: WebSettings(
+                userAgent: const WebSetting<String?>.absent(),
+                debuggingEnabled: false,
+                hasNavigationDelegate: false,
+              ),
+            ),
+          );
+
+          verify(mockWebViewProxy.setWebContentsDebuggingEnabled(false));
+        });
+
         testWidgets('userAgent', (WidgetTester tester) async {
           await buildWidget(
             tester,
             creationParams: CreationParams(
               webSettings: WebSettings(
-                userAgent: WebSetting<String?>.of('myUserAgent'),
+                userAgent: const WebSetting<String?>.of('myUserAgent'),
                 hasNavigationDelegate: false,
               ),
             ),
@@ -261,7 +285,7 @@ void main() {
             tester,
             creationParams: CreationParams(
               webSettings: WebSettings(
-                userAgent: WebSetting<String?>.absent(),
+                userAgent: const WebSetting<String?>.absent(),
                 zoomEnabled: false,
                 hasNavigationDelegate: false,
               ),
@@ -273,7 +297,131 @@ void main() {
       });
     });
 
-    group('$WebViewPlatformController', () {
+    group('WebViewPlatformController', () {
+      testWidgets('loadFile without "file://" prefix',
+          (WidgetTester tester) async {
+        await buildWidget(tester);
+
+        const String filePath = '/path/to/file.html';
+        await testController.loadFile(filePath);
+
+        verify(mockWebView.loadUrl(
+          'file://$filePath',
+          <String, String>{},
+        ));
+      });
+
+      testWidgets('loadFile with "file://" prefix',
+          (WidgetTester tester) async {
+        await buildWidget(tester);
+
+        await testController.loadFile('file:///path/to/file.html');
+
+        verify(mockWebView.loadUrl(
+          'file:///path/to/file.html',
+          <String, String>{},
+        ));
+      });
+
+      testWidgets('loadFile should setAllowFileAccess to true',
+          (WidgetTester tester) async {
+        await buildWidget(tester);
+
+        await testController.loadFile('file:///path/to/file.html');
+
+        verify(mockWebSettings.setAllowFileAccess(true));
+      });
+
+      testWidgets('loadFlutterAsset', (WidgetTester tester) async {
+        await buildWidget(tester);
+        const String assetKey = 'test_assets/index.html';
+
+        when(mockFlutterAssetManager.getAssetFilePathByName(assetKey))
+            .thenAnswer(
+                (_) => Future<String>.value('flutter_assets/$assetKey'));
+        when(mockFlutterAssetManager.list('flutter_assets/test_assets'))
+            .thenAnswer(
+                (_) => Future<List<String>>.value(<String>['index.html']));
+
+        await testController.loadFlutterAsset(assetKey);
+
+        verify(mockWebView.loadUrl(
+          'file:///android_asset/flutter_assets/$assetKey',
+          <String, String>{},
+        ));
+      });
+
+      testWidgets('loadFlutterAsset with file in root',
+          (WidgetTester tester) async {
+        await buildWidget(tester);
+        const String assetKey = 'index.html';
+
+        when(mockFlutterAssetManager.getAssetFilePathByName(assetKey))
+            .thenAnswer(
+                (_) => Future<String>.value('flutter_assets/$assetKey'));
+        when(mockFlutterAssetManager.list('flutter_assets')).thenAnswer(
+            (_) => Future<List<String>>.value(<String>['index.html']));
+
+        await testController.loadFlutterAsset(assetKey);
+
+        verify(mockWebView.loadUrl(
+          'file:///android_asset/flutter_assets/$assetKey',
+          <String, String>{},
+        ));
+      });
+
+      testWidgets(
+          'loadFlutterAsset throws ArgumentError when asset does not exists',
+          (WidgetTester tester) async {
+        await buildWidget(tester);
+        const String assetKey = 'test_assets/index.html';
+
+        when(mockFlutterAssetManager.getAssetFilePathByName(assetKey))
+            .thenAnswer(
+                (_) => Future<String>.value('flutter_assets/$assetKey'));
+        when(mockFlutterAssetManager.list('flutter_assets/test_assets'))
+            .thenAnswer((_) => Future<List<String>>.value(<String>['']));
+
+        expect(
+          () => testController.loadFlutterAsset(assetKey),
+          throwsA(
+            isA<ArgumentError>()
+                .having((ArgumentError error) => error.name, 'name', 'key')
+                .having((ArgumentError error) => error.message, 'message',
+                    'Asset for key "$assetKey" not found.'),
+          ),
+        );
+      });
+
+      testWidgets('loadHtmlString without base URL',
+          (WidgetTester tester) async {
+        await buildWidget(tester);
+
+        const String htmlString = '<html><body>Test data.</body></html>';
+        await testController.loadHtmlString(htmlString);
+
+        verify(mockWebView.loadDataWithBaseUrl(
+          data: htmlString,
+          mimeType: 'text/html',
+        ));
+      });
+
+      testWidgets('loadHtmlString with base URL', (WidgetTester tester) async {
+        await buildWidget(tester);
+
+        const String htmlString = '<html><body>Test data.</body></html>';
+        await testController.loadHtmlString(
+          htmlString,
+          baseUrl: 'https://flutter.dev',
+        );
+
+        verify(mockWebView.loadDataWithBaseUrl(
+          baseUrl: 'https://flutter.dev',
+          data: htmlString,
+          mimeType: 'text/html',
+        ));
+      });
+
       testWidgets('loadUrl', (WidgetTester tester) async {
         await buildWidget(tester);
 
@@ -286,6 +434,107 @@ void main() {
           'https://www.google.com',
           <String, String>{'a': 'header'},
         ));
+      });
+
+      group('loadRequest', () {
+        testWidgets('Throws ArgumentError for empty scheme',
+            (WidgetTester tester) async {
+          await buildWidget(tester);
+
+          expect(
+              () async => await testController.loadRequest(
+                    WebViewRequest(
+                      uri: Uri.parse('www.google.com'),
+                      method: WebViewRequestMethod.get,
+                    ),
+                  ),
+              throwsA(const TypeMatcher<ArgumentError>()));
+        });
+
+        testWidgets('GET without headers', (WidgetTester tester) async {
+          await buildWidget(tester);
+
+          await testController.loadRequest(WebViewRequest(
+            uri: Uri.parse('https://www.google.com'),
+            method: WebViewRequestMethod.get,
+          ));
+
+          verify(mockWebView.loadUrl(
+            'https://www.google.com',
+            <String, String>{},
+          ));
+        });
+
+        testWidgets('GET with headers', (WidgetTester tester) async {
+          await buildWidget(tester);
+
+          await testController.loadRequest(WebViewRequest(
+            uri: Uri.parse('https://www.google.com'),
+            method: WebViewRequestMethod.get,
+            headers: <String, String>{'a': 'header'},
+          ));
+
+          verify(mockWebView.loadUrl(
+            'https://www.google.com',
+            <String, String>{'a': 'header'},
+          ));
+        });
+
+        testWidgets('POST without body', (WidgetTester tester) async {
+          await buildWidget(tester);
+
+          await testController.loadRequest(WebViewRequest(
+            uri: Uri.parse('https://www.google.com'),
+            method: WebViewRequestMethod.post,
+          ));
+
+          verify(mockWebView.postUrl(
+            'https://www.google.com',
+            Uint8List(0),
+          ));
+        });
+
+        testWidgets('POST with body', (WidgetTester tester) async {
+          await buildWidget(tester);
+
+          final Uint8List body = Uint8List.fromList('Test Body'.codeUnits);
+
+          await testController.loadRequest(WebViewRequest(
+              uri: Uri.parse('https://www.google.com'),
+              method: WebViewRequestMethod.post,
+              body: body));
+
+          verify(mockWebView.postUrl(
+            'https://www.google.com',
+            body,
+          ));
+        });
+      });
+
+      testWidgets('no update to userAgentString when there is no change',
+          (WidgetTester tester) async {
+        await buildWidget(tester);
+
+        reset(mockWebSettings);
+
+        await testController.updateSettings(WebSettings(
+          userAgent: const WebSetting<String>.absent(),
+        ));
+
+        verifyNever(mockWebSettings.setUserAgentString(any));
+      });
+
+      testWidgets('update null userAgentString with empty string',
+          (WidgetTester tester) async {
+        await buildWidget(tester);
+
+        reset(mockWebSettings);
+
+        await testController.updateSettings(WebSettings(
+          userAgent: const WebSetting<String?>.of(null),
+        ));
+
+        verify(mockWebSettings.setUserAgentString(''));
       });
 
       testWidgets('currentUrl', (WidgetTester tester) async {
@@ -437,7 +686,7 @@ void main() {
       });
     });
 
-    group('$WebViewPlatformCallbacksHandler', () {
+    group('WebViewPlatformCallbacksHandler', () {
       testWidgets('onPageStarted', (WidgetTester tester) async {
         await buildWidget(tester);
         webViewClient.onPageStarted(mockWebView, 'https://google.com');
@@ -543,7 +792,7 @@ void main() {
         verify(mockWebView.loadUrl('https://google.com', <String, String>{}));
       });
 
-      group('$JavascriptChannelRegistry', () {
+      group('JavascriptChannelRegistry', () {
         testWidgets('onJavascriptChannelMessage', (WidgetTester tester) async {
           await buildWidget(tester);
 
@@ -560,6 +809,34 @@ void main() {
           ));
         });
       });
+    });
+  });
+
+  group('WebViewProxy', () {
+    late MockTestWebViewHostApi mockPlatformHostApi;
+    late InstanceManager instanceManager;
+
+    setUp(() {
+      // WebViewProxy calls static methods that can't be mocked, so the mocks
+      // have to be set up at the next layer down, by mocking the implementation
+      // of WebView itstelf.
+      mockPlatformHostApi = MockTestWebViewHostApi();
+      TestWebViewHostApi.setup(mockPlatformHostApi);
+      instanceManager = InstanceManager();
+      android_webview.WebView.api =
+          WebViewHostApiImpl(instanceManager: instanceManager);
+    });
+
+    test('setWebContentsDebuggingEnabled true', () {
+      const WebViewProxy webViewProxy = WebViewProxy();
+      webViewProxy.setWebContentsDebuggingEnabled(true);
+      verify(mockPlatformHostApi.setWebContentsDebuggingEnabled(true));
+    });
+
+    test('setWebContentsDebuggingEnabled false', () {
+      const WebViewProxy webViewProxy = WebViewProxy();
+      webViewProxy.setWebContentsDebuggingEnabled(false);
+      verify(mockPlatformHostApi.setWebContentsDebuggingEnabled(false));
     });
   });
 }
